@@ -12,7 +12,7 @@ Perform comprehensive code reviews of entire project codebases using specialized
 This skill uses a multi-agent review system:
 
 - **5 parallel Sonnet agents** perform specialized reviews (CLAUDE.md compliance, bugs, security, type safety, simplification)
-- **GLM-4.5-Air agents** score each issue for confidence (0-100)
+- **GLM-4.5-Air or Haiku agents** score each issue for confidence (0-100)
 - Only issues scoring ≥80 are reported to filter false positives
 
 ## Workflow
@@ -43,7 +43,7 @@ If no code files are found, inform the user and stop.
 
 ### Step 2: Find CLAUDE.md Files
 
-Use a GLM-4.5-Air agent to search for CLAUDE.md files:
+Use a GLM-4.5-Air or Haiku agent to search for CLAUDE.md files:
 
 - Look for CLAUDE.md in the root directory
 - Look for CLAUDE.md files in subdirectories containing code files
@@ -102,7 +102,7 @@ Each agent should:
 
 ### Step 5: Confidence Scoring
 
-For each issue found in Step 4, launch a parallel GLM-4.5-Air agent that:
+For each issue found in Step 4, launch a parallel GLM-4.5-Air or Haiku agent that:
 
 - Takes the issue description and CLAUDE.md files
 - Returns a confidence score (0-100):
