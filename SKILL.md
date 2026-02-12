@@ -1,25 +1,33 @@
 ---
-name: project-code-review
-description: Comprehensive code review skill for entire project codebases using parallel AI agents. Use when the user asks to review all code in a project, scan the codebase for issues, audit code quality across the project, or perform a full project code review. Also use when asked to review specific directories or sets of files. Supports optional focus areas (e.g., "focus on security", "check error handling"). Returns only high-confidence issues (score ≥80) grouped by severity (Critical, Warning, Simplification).
+name: pcr
+description: >
+  Project Code Review (PCR) — comprehensive code review skill with two modes.
+  Use `/pcr:light` for a fast 5-agent review that catches bugs, security issues, and code quality problems.
+  Use `/pcr:full` for the ultimate 8-agent deep review covering bugs, security, performance, architecture, simplification, test coverage, type safety, and convention enforcement with confidence scoring.
+  Supports optional focus areas (e.g., "/pcr:full focus on security", "/pcr:light check error handling").
+  Returns only high-confidence issues (score ≥80) grouped by severity (Critical, Warning, Simplification).
 ---
 
-# Project Code Review
+# PCR — Project Code Review
 
-Perform comprehensive code reviews of entire project codebases using specialized AI agents. This skill scans all code files in the working directory and identifies bugs, security vulnerabilities, type safety issues, CLAUDE.md compliance violations, and code simplification opportunities.
+Perform comprehensive code reviews of entire project codebases using specialized AI agent teams. This skill scans all code files in the working directory and identifies bugs, security vulnerabilities, performance issues, architectural concerns, and code quality improvements.
 
-## Overview
+## Two Modes
 
-This skill uses a multi-agent review system:
+| Mode | Command | Agents | Best For |
+|------|---------|--------|----------|
+| **Light** | `/pcr:light` | 5 agents | Quick targeted review — bugs, security, types, compliance, simplification |
+| **Full** | `/pcr:full` | 8 agents | Deep comprehensive review — everything in light + performance, architecture, test coverage |
 
-- **5 parallel Sonnet agents** perform specialized reviews (CLAUDE.md compliance, bugs, security, type safety, simplification)
-- **GLM-4.5-Air or Haiku agents** score each issue for confidence (0-100)
-- Only issues scoring ≥80 are reported to filter false positives
+If the user just runs `/pcr` without specifying a mode, **ask them which mode they want** with a brief explanation of the difference.
 
 ## Workflow
 
-Follow these steps precisely:
+Follow these steps precisely regardless of mode:
 
-### Step 1: Discover Code Files
+### Phase 0: Discovery
+
+#### Step 1: Discover Code Files
 
 Use the `scripts/find_code_files.py` script to find all reviewable code files in the working directory:
 
@@ -28,32 +36,39 @@ python3 scripts/find_code_files.py <working_directory> [max_files]
 ```
 
 The script automatically excludes:
-
 - Common non-code directories (node_modules, .git, dist, build, etc.)
 - Binary files and files >1MB
 - Hidden directories
 
 If there are more than 100 code files, consider asking the user if they want to:
-
 - Review a specific subdirectory
 - Set a max_files limit
 - Proceed with reviewing all files (may take significant time)
 
 If no code files are found, inform the user and stop.
 
-### Step 2: Find CLAUDE.md Files
+#### Step 2: Find CLAUDE.md Files
 
-Use a GLM-4.5-Air or Haiku agent to search for CLAUDE.md files:
-
+Search for CLAUDE.md files:
 - Look for CLAUDE.md in the root directory
 - Look for CLAUDE.md files in subdirectories containing code files
 
-These files contain project-specific coding guidelines that Agent #1 will check against.
+These files contain project-specific coding guidelines that review agents will check against.
 
-### Step 3: Optional Focus Area
+#### Step 3: Build Shared Context Brief
+
+Read project configuration files (package.json, requirements.txt, Cargo.toml, go.mod, etc.) and construct a brief containing:
+- Project name and description
+- Languages and frameworks detected
+- Dependency highlights
+- Conventions from CLAUDE.md (if found)
+- Architecture notes (monorepo, microservice, etc.)
+
+Pass this brief to every agent so they have full project context.
+
+#### Step 4: Optional Focus Area
 
 If the user provided a focus area argument, note it clearly. The focus might be:
-
 - A specific concern (e.g., "focus on security", "check error handling")
 - A specific area/module (e.g., "focus on the auth module")
 - A specific file type (e.g., "focus on React components")
@@ -61,49 +76,31 @@ If the user provided a focus area argument, note it clearly. The focus might be:
 
 **When a focus is provided**: All review agents should prioritize issues related to the focus area, provide more detailed analysis of focused areas, but still check for critical issues elsewhere.
 
-### Step 4: Launch 5 Parallel Review Agents
+---
 
-Read `references/review_agents.md` for complete agent configurations. Launch 5 parallel Sonnet agents, each reviewing all code files:
+### Phase 1: Deploy Review Agents (Parallel)
 
-**Agent #1**: CLAUDE.md Compliance Auditor
+Launch all agents simultaneously. Each agent receives the full file list and the shared context brief. Each agent must read every relevant file and return structured findings.
 
-- Check code against CLAUDE.md guidelines
-- Focus on project-specific conventions
+**Which agents to launch depends on the mode:**
 
-**Agent #2**: Bug and Logic Error Scanner  
+- **Light mode** (`/pcr:light`): Launch Agents 1–5
+- **Full mode** (`/pcr:full`): Launch Agents 1–8
 
-- Find bugs, logic errors, edge cases
-- Check for null/undefined, off-by-one, race conditions, error handling gaps
-
-**Agent #3**: Security Vulnerability Scanner
-
-- Scan for OWASP Top 10 vulnerabilities
-- Check for injection flaws, XSS, auth bypass, data exposure, insecure dependencies
-
-**Agent #4**: Type Safety and Performance Auditor
-
-- Check TypeScript type safety
-- Identify performance problems
-- Flag code quality concerns
-
-**Agent #5**: Code Simplification Specialist
-
-- Find opportunities to improve clarity
-- Flag unnecessary complexity
-- Identify violations of project standards
-- Flag nested ternaries and suggest clearer alternatives
+Read `references/review_agents_light.md` for Agent 1–5 configurations.
+Read `references/review_agents_full.md` for Agent 6–8 configurations (full mode only).
 
 **Important**: If a focus argument was provided, include it in each agent's prompt so they prioritize that area.
 
 Each agent should:
-
 - Read full file context when needed
-- Return a list of issues with: file path, line number, description, reason flagged
+- Return a list of issues with: file path, line number, description, reason flagged, suggested fix
 
-### Step 5: Confidence Scoring
+---
 
-For each issue found in Step 4, launch a parallel GLM-4.5-Air or Haiku agent that:
+### Phase 2: Confidence Scoring (Parallel)
 
+For each issue found in Phase 1, launch a parallel Haiku agent that:
 - Takes the issue description and CLAUDE.md files
 - Returns a confidence score (0-100):
   - **0**: False positive, doesn't stand up to scrutiny, or pre-existing issue
@@ -113,84 +110,91 @@ For each issue found in Step 4, launch a parallel GLM-4.5-Air or Haiku agent tha
   - **100**: Definitely a real issue that will happen frequently
 
 Filter out false positives:
-
 - Pre-existing issues (not in current changes if reviewing diffs)
 - Pedantic nitpicks a senior engineer wouldn't call out
 - Issues caught by linters/typeCheckers/compilers
 - Issues silenced by lint ignore comments
 - Intentional functionality changes
 
-### Step 6: Filter and Present Results
+### Phase 3: Filter and Present Results
 
 Filter out issues with confidence scores <80.
 
 If no issues meet the threshold, report:
-
 ```
-### Project Code Review
+# 🔍 Project Code Review — [Light/Full]
 
 **Focus**: <user's focus argument, if provided>
 
-No significant issues found. Code looks good.
+✅ No significant issues found. Code looks good.
 
-Checked N files for: bugs, security vulnerabilities, CLAUDE.md compliance, type safety, code clarity.
+Checked N files with [5/8] specialized agents for: [list categories checked].
 ```
 
-Otherwise, present filtered issues grouped by severity:
+Otherwise, present the full report. Write it to `CODE_REVIEW_REPORT.md` in the project root.
 
+#### Report Structure:
+
+```markdown
+# 🔍 Project Code Review Report — [Light/Full]
+## Project: [name]
+## Date: [date]
+## Files Reviewed: [count]
+## Mode: [Light (5 agents) / Full (8 agents)]
+## Total Issues Found: [count] (filtered from [raw count] raw findings)
+
+---
+
+## 🚨 CRITICAL (Score 95-100) — Must Fix Immediately
+[Issues that represent active bugs, security vulnerabilities, or data loss risks]
+
+## ⚠️ HIGH (Score 80-94) — Should Fix Soon
+[Issues that will cause problems but aren't immediately dangerous]
+
+## 📊 Summary by Category
+| Category | Critical | High | Total |
+|----------|----------|------|-------|
+| Bugs & Logic Errors | X | X | X |
+| Security Vulnerabilities | X | X | X |
+| Type Safety & Performance | X | X | X |
+| Code Simplification | X | X | X |
+| CLAUDE.md Compliance | X | X | X |
+| Performance (full only) | X | X | X |
+| Architecture (full only) | X | X | X |
+| Test Coverage (full only) | X | X | X |
+
+## 📁 Issues by File
+[Group all issues by file path so developers can fix file-by-file]
+
+## 🎯 Top 10 Highest-Impact Fixes
+[Ranked list of the 10 changes that would most improve the codebase]
+
+## 🏆 What's Done Well
+[Acknowledge patterns, practices, and code that is well-written]
 ```
-### Project Code Review
 
-**Focus**: <user's focus argument, if provided>
-
-Reviewed N files, found M issues:
-
-**Critical** (score 95-100) - Must fix
-
-1. **path/to/file.ts:42** - SQL injection vulnerability
-   
-   User input is directly concatenated into SQL query without sanitization.
-   This allows attackers to execute arbitrary SQL commands.
-   
-   Suggested fix: Use parameterized queries or an ORM.
-
-**Warning** (score 80-94) - Should consider fixing
-
-1. **path/to/file.ts:15** - Missing null check
-   
-   Variable `user` could be null/undefined here, causing runtime error.
-   
-   Suggested fix: Add null check before accessing user.email.
-
-**Simplification** (score 80-100) - Code clarity improvements
-
-1. **path/to/file.ts:28** - Nested ternary operator
-   
-   Triple-nested ternary makes logic hard to follow.
-   
-   Suggested simplification: Use if/else chain or switch statement.
-```
-
-For each issue, include:
-
-- File path and line number
-- Brief description
-- Why it matters
-- Suggested fix with code snippet if helpful
+For each issue in the report, include:
+1. File path and line number
+2. Clear description of the problem
+3. Why it matters (impact)
+4. Concrete fix with code snippet
+5. Confidence score
 
 ## Notes
 
 - Do not attempt to build or typecheck the app
 - Make a todo list first before starting the review
 - For large codebases (>100 files), consider batching or asking user to narrow scope
-- This reviews all code files, not just uncommitted changes (unlike local-review workflow)
+- This reviews all code files, not just uncommitted changes
+- Full mode takes significantly longer than Light mode — set expectations with the user
 
 ## Bundled Resources
 
 ### Scripts
 
-- `scripts/find_code_files.py` - Discovers all reviewable code files in the project directory, excluding common non-code directories
+- `scripts/find_code_files.py` — Discovers all reviewable code files in the project directory
 
 ### References
 
-- `references/review_agents.md` - Complete configurations and instructions for all 5 specialized review agents
+- `references/review_agents_light.md` — Configurations for Agents 1–5 (used in both Light and Full modes)
+- `references/review_agents_full.md` — Configurations for Agents 6–8 (used only in Full mode)
