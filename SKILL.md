@@ -78,14 +78,44 @@ If the user provided a focus area argument, note it clearly. The focus might be:
 
 ---
 
+### Phase 0.5: Create Review Team
+
+**IMPORTANT**: Before launching review agents, you MUST create a team using the `TeamCreate` tool. This enables proper agent coordination and message passing.
+
+```python
+TeamCreate with:
+- team_name: "pcr-review-{timestamp}"  # Use descriptive name
+- description: "Project Code Review team for {project_name}"
+- agent_type: "general-purpose"
+```
+
+After creating the team, note the `team_name` for use in all subsequent agent spawns.
+
+---
+
 ### Phase 1: Deploy Review Agents (Parallel)
 
-Launch all agents simultaneously. Each agent receives the full file list and the shared context brief. Each agent must read every relevant file and return structured findings.
+Launch all agents simultaneously **as teammates** using the `Task` tool with specific parameters. Each agent receives the full file list and the shared context brief.
+
+**Critical: Use correct Task parameters for teammate spawning:**
+```python
+Task(
+  description="{Agent_Role_Name}",  # e.g., "PCR Agent 1: CLAUDE Compliance"
+  prompt="{full_agent_prompt_with_context}",
+  subagent_type="general-purpose",
+  team_name="{name_from_TeamCreate}",  # MUST use team_name from Phase 0.5
+  name="{agent_role_name}"  # e.g., "agent1-claude-compliance" - unique name per agent
+)
+```
 
 **Which agents to launch depends on the mode:**
 
 - **Light mode** (`/pcr:light`): Launch Agents 1–5
 - **Full mode** (`/pcr:full`): Launch Agents 1–8
+
+**Agent naming convention** (use these exact names for consistency):
+- Light mode: `agent1-claude-compliance`, `agent2-bug-scanner`, `agent3-security-scanner`, `agent4-type-safety`, `agent5-simplification`
+- Full mode (add): `agent6-performance`, `agent7-architecture`, `agent8-test-coverage`
 
 Read `references/review_agents_light.md` for Agent 1–5 configurations.
 Read `references/review_agents_full.md` for Agent 6–8 configurations (full mode only).
@@ -95,6 +125,7 @@ Read `references/review_agents_full.md` for Agent 6–8 configurations (full mod
 Each agent should:
 - Read full file context when needed
 - Return a list of issues with: file path, line number, description, reason flagged, suggested fix
+- Send results via SendMessage to team lead when complete
 
 ---
 
@@ -180,6 +211,18 @@ For each issue in the report, include:
 4. Concrete fix with code snippet
 5. Confidence score
 
+### Phase 4: Cleanup
+
+After the report is written and presented to the user, clean up the review team:
+
+```python
+TeamDelete()  # Removes team directory and task directories
+```
+
+This ensures resources are freed up for future sessions.
+
+---
+
 ## Notes
 
 - Do not attempt to build or typecheck the app
@@ -187,6 +230,8 @@ For each issue in the report, include:
 - For large codebases (>100 files), consider batching or asking user to narrow scope
 - This reviews all code files, not just uncommitted changes
 - Full mode takes significantly longer than Light mode — set expectations with the user
+- **Always use TeamCreate before spawning agents** — this is required for proper teammate coordination
+- **Always include `team_name` and `name` parameters** when spawning review agents via Task tool
 
 ## Bundled Resources
 
