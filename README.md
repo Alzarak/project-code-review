@@ -14,23 +14,38 @@ A comprehensive code review skill for [Claude Code](https://claude.ai/code) that
 
 ## How It Works
 
-The skill implements a two-stage review pipeline:
+The skill supports two review modes: **Fast** (default) and **Full**.
 
-### Stage 1: Parallel Analysis
+### Fast Mode (`/pcr:fast`)
+
+- **Single-Pass**: The main agent reviews code directly without spawning sub-agents.
+- **Speed**: ~1-2 minutes.
+- **Best for**: Quick feedback, iterative development, and smaller changes.
+
+### Full Mode (`/pcr:full`)
+
+- **Multi-Agent**: Spawns 5 specialized sub-agents in parallel.
+- **Confidence Scoring**: Uses a dedicated scorer to filter false positives.
+- **Speed**: ~5-10 minutes.
+- **Best for**: Pre-release audits, security scans, and deep verification.
+
+#### Full Mode Architecture
+
+##### Stage 1: Parallel Analysis
 
 Five specialized Sonnet agents analyze all code files simultaneously:
 
 | Agent | Focus |
-|-------|-------|
+| :--- | :--- |
 | #1 | CLAUDE.md Compliance Auditor |
 | #2 | Bug and Logic Error Scanner |
 | #3 | Security Vulnerability Scanner |
 | #4 | Type Safety and Performance Auditor |
 | #5 | Code Simplification Specialist |
 
-### Stage 2: Confidence Scoring
+##### Stage 2: Confidence Scoring
 
-Each identified issue is evaluated by GLM-4.5-Air agents that score confidence:
+Each identified issue is evaluated by **Claude 3 Haiku** agents that score confidence:
 
 - **0**: False positive or pre-existing issue
 - **25**: Possible issue, low confidence
@@ -45,6 +60,7 @@ Only issues scoring ≥80 are reported, minimizing false positives.
 This is a Claude Code skill. To install:
 
 1. Clone this repository to your Claude skills directory:
+
    ```bash
    git clone https://github.com/yourusername/project-code-review.git ~/.claude/skills/project-code-review
    ```
@@ -53,13 +69,24 @@ This is a Claude Code skill. To install:
 
 ## Usage
 
-### Basic Review
+### Fast Review (Default)
 
-Review the entire codebase in your current directory:
+Quickly review the codebase (single-pass, no sub-agents):
 
 ```bash
-cd /path/to/your/project
-claude-code "Please review all the code in this project"
+/pcr
+# OR
+claude-code "Review this project"
+```
+
+### Full Review (Deep Scan)
+
+Perform a comprehensive multi-agent review with confidence scoring:
+
+```bash
+/pcr:full
+# OR
+claude-code "Full project code review"
 ```
 
 ### Focused Review
@@ -156,19 +183,19 @@ Results are grouped by severity:
 
 The review automatically excludes:
 
-- Common non-code directories: `node_modules`, `.git`, `dist`, `build`, `__pycache__`, `.next`, `.nuxt`
-- IDE directories: `.idea`, `.vscode`, `.gradle`
-- Dependency directories: `vendor`, `venv`, `.venv`, `bower_components`
-- Cache directories: `.cache`, `coverage`, `.pytest_cache`, `.mypy_cache`
-- Files larger than 1MB
+- **Common non-code directories**: `node_modules`, `.git`, `dist`, `build`, `__pycache__`, `.next`, `.nuxt`, `target`, `out`, `tmp`, `temp`, `.DS_Store`
+- **IDE directories**: `.idea`, `.vscode`, `.gradle`
+- **Dependency directories**: `vendor`, `venv`, `.venv`, `env`, `.env`, `bower_components`
+- **Cache directories**: `.cache`, `coverage`, `.pytest_cache`, `.mypy_cache`, `.sass-cache`
+- **Files larger than 1MB**
 
 ## Supported Languages
 
-Python, JavaScript, TypeScript, JSX, TSX, Java, C, C++, C#, Go, Rust, Ruby, PHP, Swift, Kotlin, Scala, Shell, SQL, and more.
+Python, JavaScript, TypeScript, JSX, TSX, Java, C, C++, C#, Go, Rust, Ruby, PHP, Swift, Kotlin, Scala, Shell (`.sh`, `.bash`, `.zsh`, `.fish`), SQL, R, Lua, Perl, Vue, Svelte, Astro, Elm, Elixir, Erlang, Clojure, Haskell, OCaml, F#, VB.NET, Groovy, Dart, Objective-C/C++, Config files (`.yaml`, `.json`, `.toml`, `.xml`), Web (`.html`, `.css`, `.scss`, `.less`), Documentation (`.md`, `.rst`, `.tex`), and more.
 
 ## Project Structure
 
-```
+```text
 project-code-review/
 ├── SKILL.md                    # Main skill definition
 ├── CLAUDE.md                   # This repo's development guidelines
