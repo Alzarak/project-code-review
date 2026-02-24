@@ -13,18 +13,17 @@ EXCLUDE_DIRS = {
     'node_modules', '.git', '__pycache__', '.next', '.nuxt', 'dist', 'build',
     '.cache', 'coverage', '.pytest_cache', '.mypy_cache', 'vendor', 'venv',
     '.venv', 'env', '.env', 'target', 'out', '.gradle', '.idea', '.vscode',
-    'bower_components', '.sass-cache', 'tmp', 'temp', '.DS_Store'
+    'bower_components', '.sass-cache', 'tmp', 'temp'
 }
 
-# File extensions to include (common code files)
+# File extensions to include (code files only — excludes config, docs, markup)
 CODE_EXTENSIONS = {
     '.py', '.js', '.jsx', '.ts', '.tsx', '.java', '.c', '.cpp', '.h', '.hpp',
     '.cs', '.go', '.rs', '.rb', '.php', '.swift', '.kt', '.scala', '.sh',
     '.bash', '.zsh', '.fish', '.sql', '.r', '.m', '.mm', '.dart', '.lua',
     '.pl', '.pm', '.vue', '.svelte', '.astro', '.elm', '.ex', '.exs', '.erl',
     '.clj', '.cljs', '.cljc', '.hs', '.ml', '.fs', '.fsx', '.vb', '.groovy',
-    '.gradle', '.cmake', '.yaml', '.yml', '.json', '.toml', '.xml', '.html',
-    '.css', '.scss', '.sass', '.less', '.md', '.rst', '.tex'
+    '.gradle', '.cmake'
 }
 
 def should_exclude_dir(dir_name):
@@ -41,7 +40,7 @@ def is_code_file(file_path):
     try:
         if file_path.stat().st_size > 1_000_000:
             return False
-    except:
+    except OSError:
         return False
     
     return True
